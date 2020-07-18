@@ -534,4 +534,104 @@ fn main() {
 ```
 
 # Chapter 4 - Ownership
+Ownership enables Rust to make memory safety guarantees without needing a garbage collector
+
+We are going to talk about ownership and other related features: borrowing, slices, and how Rust organizes data in memory
+
+Rust manages memory through a system of ownership with a set of rules the compiler checks at runtime, none of the ownership features slow down the program while it's running
+
+#### The Stack and the Heap
+Parts of ownership can be described in relation to the stack and the heap 
+
+The stack and the heap are parts of memory that are available to the code at runtime but they are structure in different ways
+
+The stack stores values in the order it gets them and removes the values in the opposite order this is reffered to as last in, first out, Adding data is called pushing onto the stack and removing data is called popping off the stack
+
+All data stored on the stack must have a known fixed size, data with an unknown size or a sizer that might change must be stored on the heap instead
+
+The heap is less organized when you put data on the heap you request a certain amount of space
+
+The memory allocator finds a spot to put that data on the heap and returns a pointer to that data
+
+That pointer is stored on the stack because it's size is known
+
+Pushing to the stack is faster than allocating on the heap because the allocator never has to find a spot to store that data
+
+Accessing data in the heap is slower than accessing data on the stack as well because you have to follow a pointer to get there
+
+#### Back to ownership
+Ownership rules:
+ - Each value in rust has a variable that's called its owner
+ - There can only be one owner at a time
+ - When the owner goes out of scope, the value will be dropped
+ 
+###### Variable Scope
+This is how scope works: 
+```
+fn main() {
+    {                      // s is not valid here, it’s not yet declared
+        let s = "hello";   // s is valid from this point forward
+
+        // do stuff with s
+    }                      // this scope is now over, and s is no longer valid
+}
+```
+When *s* comes into scope it is valid and it's valid until it goes out of scope
+
+###### The String type
+We can use string literals to declare a string but that string will be immutable
+
+Rust has a second string type: `String` This type is allocated on the heap and is able to store an amount of text that is unknown to us at compile time:`let s = String::from("hello");`
+
+This type of string can be mutated unlike string literals
+
+###### Memory and Allocation
+In the case of s tring literal we know the contents at compile time so the text is harcoded directly into the final executable, this makes it immutable
+
+With the `String` type in order to support a mutable growable piece of text:
+	- The memory must be requested from the memory allocator at runtime
+	- We need a way of returning this memory to the allocator when we are done with the `String`
+	
+The first part is done by us when we call `String::from`
+
+The second part is different however in languages with a garbage collector the GC cleans memory that isn't being used anymore and we don't have to think about it, without a GC it becomes our responsibility
+
+Rust takes a different path: memory is automatically returned once the variable that owns it is out of scope:
+```
+fn main() {
+    {
+        let s = String::from("hello"); // s is valid from this point forward
+
+        // do stuff with s
+    }                                  // this scope is now over, and s is no
+                                       // longer valid
+}
+```
+
+When a variable goes out of scope rust automatically calls a special function for us called `drop`
+
+
+###### Ways Variables and Data Interact: Move
+
+Let's say we have this code: 
+```
+fn main() {
+    let x = 5;
+    let y = x;
+}
+```
+Rust will push two values equal to 5 onto the stack
+
+Let's do the same with `String`
+```
+fn main() {
+    let s1 = String::from("hello");
+    let s2 = s1;
+}
+```
+
+In this case when we create `s1` we are allocating memory in the heap and pushing a `String` onto the stack the `String` on the stack consists of a pointer to where the string in the heap is, the length in bytes that the string in the heap is using and the capacity which we will talk about more later
+
+When we assign 
+
 
