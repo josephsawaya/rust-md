@@ -41,6 +41,8 @@
   - [5.2 An example program using structs](#52-an-example-program-using-structs)
     - [Adding functionality using derived traits](#adding-functionality-using-derived-traits)
   - [5.3 The method Syntax](#53-the-method-syntax)
+    - [Methods with More Parameters](#methods-with-more-parameters)
+    - [Associated functions](#associated-functions)
 
 # Chapter 1
 
@@ -1165,3 +1167,36 @@ fn main() {
 We start an `impl` block and move the area function definition inside that block passing a parameter of `&self` intothat function
 
 Methods can take ownership of `self`, borrow `self` immutably or borrow `self` mutably
+
+### Methods with More Parameters
+
+example:
+
+```
+impl Rectangle {
+    fn area(&self) -> u32 {
+        self.width * self.height
+    }
+
+    fn can_hold(&self, other: &Rectangle) -> bool {
+        self.width > other.width && self.height > other.height
+    }
+}
+```
+
+### Associated functions
+
+Associated functions are often used for constructors that will return a new instace of the struct, example:
+
+```
+impl Rectangle {
+    fn square(size: u32) -> Rectangle {
+        Rectangle {
+            width: size,
+            height: size,
+        }
+    }
+}
+```
+
+To call this function we do: `let sq = Rectangle::square(3);`
