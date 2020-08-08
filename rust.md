@@ -43,6 +43,17 @@
   - [5.3 The method Syntax](#53-the-method-syntax)
     - [Methods with More Parameters](#methods-with-more-parameters)
     - [Associated functions](#associated-functions)
+    - [Multiple impl blocks](#multiple-impl-blocks)
+    - [Summary](#summary)
+- [Chapter 6 - Enums and Pattern Matching](#chapter-6---enums-and-pattern-matching)
+  - [5.2 Defining an Enum](#52-defining-an-enum)
+    - [Enum values](#enum-values)
+    - [The Option enum and its advantages over null values](#the-option-enum-and-its-advantages-over-null-values)
+    - [The match control flow operator](#the-match-control-flow-operator)
+    - [Patterns that bind to values](#patterns-that-bind-to-values)
+    - [Matching with Option<T>](#matching-with-optiont)
+    - [Matches are axhaustive](#matches-are-axhaustive)
+    - [The \_ placeholder](#the-_-placeholder)
 
 # Chapter 1
 
@@ -1200,3 +1211,258 @@ impl Rectangle {
 ```
 
 To call this function we do: `let sq = Rectangle::square(3);`
+
+### Multiple impl blocks
+
+We can use multiple `impl` blocks for the same struct if we so choose and it can be useful when tackling generics and traits
+
+### Summary
+
+Rust lets you create custom types with meaning, methods let you specify behaviour taht instances of your structs have and associated function let you namespace functionality that is particular to your struct without having an instance available
+
+# Chapter 6 - Enums and Pattern Matching
+
+Enums allow you to define a type by enumerating it;s possible variants
+
+## 5.2 Defining an Enum
+
+example:
+
+```
+enum IpAddrKind {
+    V4,
+    V6
+}
+```
+
+Enum values can be only one of its variants
+
+### Enum values
+
+example:
+
+```
+let four = IpAddrKind::V4;
+let six = IpAddrKind::V6;
+```
+
+both values `IpAddrKind::V4` and `IpAddrKind::V6` are of the same type: `IpAddrKind`
+
+we can define a function that takes any `IpAddrKind`
+
+```
+fn route(ip_kind: IpAddrKind){}
+```
+
+We can also use enums in structs like so:
+
+```
+enum IpAddrKind {
+    V4,
+    V6,
+}
+
+struct IpAddr {
+    kind: IpAddrKind,
+    address: String,
+}
+
+let home = IpAddr {
+    kind: IpAddrKind::V4,
+    address: String::from("127.0.0.1"),
+};
+
+let loopback = IpAddr {
+    kind: IpAddrKind::V6,
+    address: String::from("::1"),
+};
+```
+
+We can do the same thing avoiding the use of structs by putting data directly into each enum variant:
+
+```
+enum IpAddr {
+    V4(String),
+    V6(String),
+}
+
+let home = IpAddr::V4(String::from("127.0.0.1"));
+
+let loopback = IpAddr::V6(String::from("::1"));
+```
+
+If we want to store different types of data in each variant we can also do that:
+
+```
+enum IpAddr {
+    V4(u8, u8, u8, u8),
+    V6(String),
+}
+
+let home = IpAddr::V4(127, 0, 0, 1);
+
+let loopback = IpAddr::V6(String::from("::1"));
+```
+
+As a matter of fact you can put any kind of data inside an enum variant even structs
+
+Let's look at a new enum:
+
+```
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+```
+
+We can define method on enums like so:
+
+```
+impl Message {
+    fn call(&self) {
+        // method body would be defined here
+    }
+}
+
+let m = Message::Write(String::from("hello"));
+m.call();
+```
+
+### The Option enum and its advantages over null values
+
+Rust has an enum that can encode the concept of a value being present or absent: `Option<T>`
+
+it is defined as this:
+
+```
+enum Option<T>{
+    Some(T),
+    None,
+}
+```
+
+it's included in the prelude and you can use it's variants without the `Option::` prefix
+
+The `<T>` is the use of a generic, all you need to know for now is that the `Some` variant can hold on piece of data of any type
+
+example:
+
+```
+let some_number = Some(5);
+let some_string = Some("a string");
+
+let absent_number: Option<i32> = None;
+```
+
+Having `Option<T>` is better than having null because technically `Option<T>` and `T` are of different types
+
+example:
+
+```
+let x: i8 = 5;
+let y: Option<i8> = Some(5);
+
+let sum = x + y;
+```
+
+this doesn't compile because you cannot add `Option<T>` and `T` so you have to convert an `Option<T>` to a `T` before you can perform `T` operations with it
+
+### The match control flow operator
+
+The `match` expression is a control flow construct that will run different code depending on which variant of the enum it has and that code can use the data inside the matching value
+
+example:
+
+```
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter,
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter => 25,
+    }
+}
+```
+
+First we list the `match` keyword followed by an expression which in this case is `coin`, the type of coin in this case is `Coin` enum
+
+Next are the `match` arms, an arm has two parts a pattern ans some code, the first arm here has a pattern that is the value `Coin::Penny` and then the `=>` operator seperates the pattern and the code to run, the code in this case is just the value `1`, each arm is seperated from the next with a comma
+
+### Patterns that bind to values
+
+example:
+
+```
+#[derive(Debug)] // so we can inspect the state in a minute
+enum UsState {
+    Alabama,
+    Alaska,
+    // --snip--
+}
+
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter(UsState),
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter(state) => {
+            println!("State quarter from {:?}!", state);
+            25
+        }
+    }
+}
+```
+
+### Matching with Option<T>
+
+```
+fn plus_one(x: Option<i32>) -> Option<i32> {
+    match x {
+        None => None,
+        Some(i) => Some(i + 1),
+    }
+}
+
+let five = Some(5);
+let six = plus_one(five);
+let none = plus_one(None);
+```
+
+### Matches are axhaustive
+
+A `match` statement won't work unless you cover every possible case, example: you must explicitly cover the `None` case when matching an `Option` enum
+
+### The \_ placeholder
+
+Rust also has a pattern we can use when we don't want to list all possible values, so we can use the \_ pattern instead
+
+It will match any value that the cases above it have not matched
+
+example:
+
+```
+let some_u8_value = 0u8;
+match some_u8_value {
+    1 => println!("one"),
+    3 => println!("three"),
+    5 => println!("five"),
+    7 => println!("seven"),
+    _ => (),
+}
+```
