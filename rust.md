@@ -54,6 +54,10 @@
     - [Matching with Option<T>](#matching-with-optiont)
     - [Matches are axhaustive](#matches-are-axhaustive)
     - [The \_ placeholder](#the-_-placeholder)
+    - [Concise control flow with if let](#concise-control-flow-with-if-let)
+- [Chapter 7 - Managing growing projects with Packages, Crates and Modules](#chapter-7---managing-growing-projects-with-packages-crates-and-modules)
+  - [7.1 Packages and Crates](#71-packages-and-crates)
+  - [7.2 Defining modules to control scope and privacy](#72-defining-modules-to-control-scope-and-privacy)
 
 # Chapter 1
 
@@ -1466,3 +1470,82 @@ match some_u8_value {
     _ => (),
 }
 ```
+
+The `match` statement can be wordy for a situation where we only care about on of the possibilities for a value in this case we would use `if let`
+
+### Concise control flow with if let
+
+The `if let` syntax lets you combine `if` and `let` into a less verbose way to handle values that match one pattern while ignoring the rest
+
+```
+   if let Some(3) = some_u8_value {
+        println!("three");
+    }
+```
+
+In this case if `some_u8_value` is equal to `Some(3)` then it will `println!` else it will do nothing
+
+We can alos combine it with an `else` statement like so:
+
+```
+let mut count = 0;
+    if let Coin::Quarter(state) = coin {
+        println!("State quarter from {:?}!", state);
+    } else {
+        count += 1;
+    }
+```
+
+# Chapter 7 - Managing growing projects with Packages, Crates and Modules
+
+## 7.1 Packages and Crates
+
+The first parts of the module system we'll cover are packages and crates. A crate is a binary or library.
+
+A package is one or more crates that provide a set of functionality.
+
+A package contains a cargo.toml file that describes how to build those crates.
+
+Several rules determine what a package can contain, it must contain 0 or 1 library crates and as many binary crates as you like it must contain at least 1 crate.
+
+To create a package we must start with `cargo new`.
+
+When we run this command Cargo creates a cargo.toml giving us a package.
+
+Cargo follows a convention that src/main.ss is the crate root of a binary crate with the same name as the package, Cargo also knows that if the package contains src/lib.rs the package contains a library crate with the same name as the package and lib.rs is its crate root.
+
+Cargo passes the crate root files to `rustc` to build the library or binary.
+
+A package can have multiple binary crates by placing files in the src/bin directory, each file will be a separate binary crate.
+
+A crate will group related functionality together in a scope so the functionality is easy to share between multiple projects.
+
+A crate will group related functionality together in a scope so the functionality is easy to share between multiple projects.
+
+## 7.2 Defining modules to control scope and privacy
+
+The `use` keyword allows us to bring paths into the scope and the `pub` keyword allows us to make items public
+
+Modules let us organize code within a crate into groups for readability and easy reuse. Modules also control the privacy of items, which is whether an item can be used by outside code (public) or is an internal implementation detail and not available for outside use (private).
+
+Modules can contain other modules
+
+Let's start with an example of a restuarant, that has a front of house and a back of house:
+
+````
+v
+```mod front_of_house {
+    mod hosting {
+        fn add_to_waitlist() {}
+
+        fn seat_at_table() {}
+    }
+
+    mod serving {
+        fn take_order() {}
+
+        fn serve_order() {}
+
+        fn take_payment() {}
+    }
+````
