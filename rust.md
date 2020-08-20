@@ -52,12 +52,14 @@
     - [The match control flow operator](#the-match-control-flow-operator)
     - [Patterns that bind to values](#patterns-that-bind-to-values)
     - [Matching with Option<T>](#matching-with-optiont)
-    - [Matches are axhaustive](#matches-are-axhaustive)
+    - [Matches are exhaustive](#matches-are-exhaustive)
     - [The \_ placeholder](#the-_-placeholder)
     - [Concise control flow with if let](#concise-control-flow-with-if-let)
 - [Chapter 7 - Managing growing projects with Packages, Crates and Modules](#chapter-7---managing-growing-projects-with-packages-crates-and-modules)
   - [7.1 Packages and Crates](#71-packages-and-crates)
   - [7.2 Defining modules to control scope and privacy](#72-defining-modules-to-control-scope-and-privacy)
+    - [7.3 Paths for referring to an Item in the module tree](#73-paths-for-referring-to-an-item-in-the-module-tree)
+    - [7.5 Seperating modules into different files](#75-seperating-modules-into-different-files)
 
 # Chapter 1
 
@@ -1448,7 +1450,7 @@ let six = plus_one(five);
 let none = plus_one(None);
 ```
 
-### Matches are axhaustive
+### Matches are exhaustive
 
 A `match` statement won't work unless you cover every possible case, example: you must explicitly cover the `None` case when matching an `Option` enum
 
@@ -1532,9 +1534,8 @@ Modules can contain other modules
 
 Let's start with an example of a restuarant, that has a front of house and a back of house:
 
-````
-v
-```mod front_of_house {
+```
+mod front_of_house {
     mod hosting {
         fn add_to_waitlist() {}
 
@@ -1548,4 +1549,255 @@ v
 
         fn take_payment() {}
     }
-````
+```
+
+We define a module by using the `mod` keyword and specifying the name of the module.
+
+Inside the module we can have other modules, structs, enums, constants, traits or function.
+
+Here is the module tree:
+
+```
+crate
+ └── front_of_house
+     ├── hosting
+     │   ├── add_to_waitlist
+     │   └── seat_at_table
+     └── serving
+         ├── take_order
+         ├── serve_order
+         └── take_payment
+```
+
+If module A is contained inside module B, we say that module A is the child of module B and that module B is the parent of module A.
+
+The entire module is rooted under the implicit module named crate
+
+### 7.3 Paths for referring to an Item in the module tree
+
+To show Rust where to finmd an item in the module tree, we use a path in the wame way we use a path when navigating a filesystem, a path can take two forms, absolute and relative:
+
+```
+pub fn eat_at_restaurant() {
+    // Absolute path
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // Relative path
+    front_of_house::hosting::add_to_waitlist();
+}
+```
+
+This won't actually compile however here is the error message we get:
+
+```
+error[E0603]: module `hosting` is private
+ --> src/lib.rs:9:28
+  |
+9 |     crate::front_of_house::hosting::add_to_waitlist();
+  |                            ^^^^^^^
+
+error[E0603]: module `hosting` is private
+  --> src/lib.rs:12:21
+   |
+12 |     front_of_house::hosting::add_to_waitlist();
+   |                     ^^^^^^^
+
+error: aborting due to 2 previous errors
+```
+
+It says that `hosting` is private, we have the correct paths but Rust won't let us use the module because it doesn't have access to the private sections.
+
+Modules aren't just useful for organizing code they also define Rust's privacy boundary, if you want to make an item like a function or a structg private wou put it in a module
+
+The way privacy works in Rust is that all items (functions, methods, structs, enums, modules, and constants) are private by default. Items in a parent module can’t use the private items inside child modules, but items in child modules can use the items in their ancestor modules
+
+You can expose parts of child modules' code to ancestor modules by using the `pub` keyword.
+
+```
+mod front_of_house {
+    pub mod hosting {
+        fn add_to_waitlist() {}
+    }
+}
+
+pub fn eat_at_restaurant() {
+    // Absolute path
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // Relative path
+    front_of_house::hosting::add_to_waitlist();
+}
+```
+
+This still results in an error since we have to make the function inside `hosting` public as well.
+
+We can start relative paths with `super` which is the equivalent of using `..` in the filesystem
+
+```
+fn serve_order() {}
+
+mod back_of_house {
+    fn fix_incorrect_order() {
+        cook_order();
+        super::serve_order();
+    }
+
+    fn cook_order() {}
+}
+```
+
+We can also use `pub` to make structs and enums public but even if we make a struct public it's fields will still be private:
+
+```
+mod back_of_house {
+    pub struct Breakfast {
+        pub toast: String,
+        seasonal_fruit: String,
+    }
+
+    impl Breakfast {
+        pub fn summer(toast: &str) -> Breakfast {
+            Breakfast {
+                toast: String::from(toast),
+                seasonal_fruit: String::from("peaches"),
+            }
+        }
+    }
+}
+
+pub fn eat_at_restaurant() {
+    // Order a breakfast in the summer with Rye toast
+    let mut meal = back_of_house::Breakfast::summer("Rye");
+    // Change our mind about what bread we'd like
+    meal.toast = String::from("Wheat");
+    println!("I'd like {} toast please", meal.toast);
+
+    // The next line won't compile if we uncomment it; we're not allowed
+    // to see or modify the seasonal fruit that comes with the meal
+    // meal.seasonal_fruit = String::from("blueberries");
+}
+```
+
+However with enums, if we make it public all of its variants are also public
+
+It might seem repetitive to type the absolute or relative paths evry time we want to use a function in another module so if we want to get rid of this redundancy we can use the `use` keyword
+
+```
+mod front_of_house {
+    pub mod hosting {
+        pub fn add_to_waitlist() {}
+    }
+}
+
+use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+}
+```
+
+Adding `use` and a path in a scope is similar to creating a symlink in the filesystem, by adding that line in the crate root, `hosting` is a valid name in that just as if the `hosting` module was defined in the crate root
+
+You can also use relative paths with the `use` keyword
+
+This is how we like to specify `use` paths for functions in Rust instead of pathing all the way to the function itsself since it makes it clear that it's not a part of our scope
+
+When bringing in structs, enums and other items we do specify the full path however, unless they have the same names
+
+For this issue however we can use the `as` keyword to rename imports:
+
+```
+use std::fmt::Result;
+use std::io::Result as IoResult;
+
+fn function1() -> Result {
+    // --snip--
+}
+
+fn function2() -> IoResult<()> {
+    // --snip--
+}
+```
+
+We can re-export names with `pub use`
+
+```
+mod front_of_house {
+    pub mod hosting {
+        pub fn add_to_waitlist() {}
+    }
+}
+
+pub use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+}
+```
+
+We can use external packages by adding them in our cargo.toml, example:
+
+```
+[dependencies]
+rand = "0.5.5"
+```
+
+To bring `rand` definitions into the scope:
+
+```
+use rand::Rng;
+
+fn main() {
+    let secret_number = rand::thread_rng().gen_range(1, 101);
+}
+```
+
+Note that the standard library `std` is also a crate that's external to our package so we do have to use the `use` keyword with it
+
+If we're using multiple items from the same package or module we can use nested paths:
+
+```
+use std::{cmp::Ordering, io};
+```
+
+we can even use the `self` keyword here:
+
+```
+use std::io::{self, Write};
+```
+
+this line will bring `std::io` and `std::io::Write` into scope
+
+If we want to bring all public items defined in a path into scope, we can use the glob operator: `*`
+
+`use std::collections::*`
+
+### 7.5 Seperating modules into different files
+
+If we want to move the module `front_of_house` to its own file we change the crate root file:
+
+```
+mod front_of_house;
+
+pub use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+}
+```
+
+In src/front_of_house.rs we now write this code:
+
+```
+pub mod hosting {
+    pub fn add_to_waitlist() {}
+}
+```
+
+Using the semicolon after `mod front_of_house` tells Rust to load the contents of the module from another file with the same name as the module
