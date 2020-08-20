@@ -58,8 +58,16 @@
 - [Chapter 7 - Managing growing projects with Packages, Crates and Modules](#chapter-7---managing-growing-projects-with-packages-crates-and-modules)
   - [7.1 Packages and Crates](#71-packages-and-crates)
   - [7.2 Defining modules to control scope and privacy](#72-defining-modules-to-control-scope-and-privacy)
-    - [7.3 Paths for referring to an Item in the module tree](#73-paths-for-referring-to-an-item-in-the-module-tree)
-    - [7.5 Seperating modules into different files](#75-seperating-modules-into-different-files)
+  - [7.3 Paths for referring to an Item in the module tree](#73-paths-for-referring-to-an-item-in-the-module-tree)
+  - [7.4 - Bringing paths into scope using the use keyword](#74---bringing-paths-into-scope-using-the-use-keyword)
+  - [7.5 Seperating modules into different files](#75-seperating-modules-into-different-files)
+- [Chapter 8 - Common Collections](#chapter-8---common-collections)
+  - [8.1 Storing lists of values with vectors](#81-storing-lists-of-values-with-vectors)
+    - [Creating a vector](#creating-a-vector)
+    - [Updating a vector](#updating-a-vector)
+    - [Reading elements of vectors](#reading-elements-of-vectors)
+    - [Iterating over values in a vector](#iterating-over-values-in-a-vector)
+    - [Using an enum to store multiple types](#using-an-enum-to-store-multiple-types)
 
 # Chapter 1
 
@@ -1573,7 +1581,7 @@ If module A is contained inside module B, we say that module A is the child of m
 
 The entire module is rooted under the implicit module named crate
 
-### 7.3 Paths for referring to an Item in the module tree
+## 7.3 Paths for referring to an Item in the module tree
 
 To show Rust where to finmd an item in the module tree, we use a path in the wame way we use a path when navigating a filesystem, a path can take two forms, absolute and relative:
 
@@ -1680,6 +1688,8 @@ pub fn eat_at_restaurant() {
 
 However with enums, if we make it public all of its variants are also public
 
+## 7.4 - Bringing paths into scope using the use keyword
+
 It might seem repetitive to type the absolute or relative paths evry time we want to use a function in another module so if we want to get rid of this redundancy we can use the `use` keyword
 
 ```
@@ -1776,7 +1786,7 @@ If we want to bring all public items defined in a path into scope, we can use th
 
 `use std::collections::*`
 
-### 7.5 Seperating modules into different files
+## 7.5 Seperating modules into different files
 
 If we want to move the module `front_of_house` to its own file we change the crate root file:
 
@@ -1801,3 +1811,109 @@ pub mod hosting {
 ```
 
 Using the semicolon after `mod front_of_house` tells Rust to load the contents of the module from another file with the same name as the module
+
+# Chapter 8 - Common Collections
+
+Rusts standard library contains a number of data structures called `collections`, most other data types represent one specific value but collections can contain multiple values, unlike the built-in array and tuple types the data these collections point to is stored on the heap which mean the amount of data does not need to be known at compile time and can grow or shrink as the program runs.
+
+- Vector allows you to store a variable number of values next to each other - Strgin is a collection of characters - Hash map allows you to associate a value with a particular key, it's an implementation of the more general data structure called a map
+
+## 8.1 Storing lists of values with vectors
+
+The first collection type we'll look at is `Vec<T>` also known as vector. They allow you to store more than one value in a single data structure that puts all the values next to each other in memory. Vectors can only store values of the same type.
+
+### Creating a vector
+
+To create an empty vector we call the `Vec::new` function:
+
+```
+let v: Vec<i32> = Vec::new()
+```
+
+We have to add a type annotation here because we aren't inserting any values into this vector
+
+It's more common to create a `Vec<T>` with initial values and we can use the `vec!` macro:
+
+```
+let v = vec![1, 2, 3];
+```
+
+Because we've given initial `i32` values rust can infer that the type of v is `Vec<i32>` and the type annotation isn't necessary
+
+### Updating a vector
+
+To create a vector and add elements to it we can use the `push` method:
+
+```
+let mut v = Vec::new();
+
+v.push(5);
+v.push(6);
+v.push(7);
+v.push(8);
+```
+
+As with any variable if we want to change its value we need to make it mutable
+
+Dropping a vector drops its elements
+
+### Reading elements of vectors
+
+There are two ways to reference a value store in a vector:
+
+We can use the get method or use indexing syntax:
+
+```
+let v = vec![1,2,3];
+
+let third: &i32 = &v[2];
+
+match v.get(2) {
+    Some(third) => println!("{}", third),
+    None => println!("None"),
+}
+```
+
+Note vectors start at index 0
+
+The indexing method returns us a reference and the `get` method returns an Option<&T>
+
+The difference between these methods is that the if we do an out of range access with the indexing method the program will crash and if we do an out of range access with the `get` method it will return `None`
+
+### Iterating over values in a vector
+
+If we want to access each element in a vector in turn we can iterate through all the elements using a for loop:
+
+```
+let v = vec![100, 32, 57];
+for i in &v {
+    println!("{}", i);
+}
+```
+
+We cam also iterate over mutable references:
+
+```
+let mut v = vec![100, 32, 57];
+for i in &mut v {
+    *i += 50;
+}
+```
+
+### Using an enum to store multiple types
+
+At the beginning of this chapter, we said that vectors can only store values that are the same type, this can be inconvenient, fortunately the variants of an enum are defined under the same type so when we need to store elements of a different type in a vectore we can define and use an enum
+
+```
+enum SpreadsheetCell {
+    Int(i32),
+    Float(f64),
+    Text(String),
+}
+
+let row = vec![
+    SpreadsheetCell::Int(3),
+    SpreadsheetCell::Text(String::from("blue")),
+    SpreadsheetCell::Float(10.12),
+];
+```
