@@ -68,6 +68,21 @@
     - [Reading elements of vectors](#reading-elements-of-vectors)
     - [Iterating over values in a vector](#iterating-over-values-in-a-vector)
     - [Using an enum to store multiple types](#using-an-enum-to-store-multiple-types)
+  - [8.2 Storing UTF-8 encoded texts in Strings](#82-storing-utf-8-encoded-texts-in-strings)
+    - [Creating a String](#creating-a-string)
+    - [Updating a String](#updating-a-string)
+    - [Concatenating strings using the + operator](#concatenating-strings-using-the--operator)
+    - [Indexing into strings](#indexing-into-strings)
+    - [Slicing strings](#slicing-strings)
+    - [Methods for iterating over strings](#methods-for-iterating-over-strings)
+  - [8.2 Hash Maps](#82-hash-maps)
+    - [Creating a new hash map](#creating-a-new-hash-map)
+    - [Hash maps and ownership](#hash-maps-and-ownership)
+    - [Accessing values in a hash map](#accessing-values-in-a-hash-map)
+    - [Updating a hash map](#updating-a-hash-map)
+- [Chapter 9 - Error Handling](#chapter-9---error-handling)
+  - [Unrecoverable errors with panic!](#unrecoverable-errors-with-panic)
+  - [Recoverable errors with Result](#recoverable-errors-with-result)
 
 # Chapter 1
 
@@ -1916,4 +1931,248 @@ let row = vec![
     SpreadsheetCell::Text(String::from("blue")),
     SpreadsheetCell::Float(10.12),
 ];
+```
+
+## 8.2 Storing UTF-8 encoded texts in Strings
+
+### Creating a String
+
+Creating a new `String`:
+
+```
+let s: String = String::new();
+```
+
+We can also create a `String` from any type that has the `Display` trait implemented:
+
+```
+let s = "bruh".to_string();
+```
+
+We can also use `String::from`:
+
+```
+let s = String::from("bruh");
+```
+
+### Updating a String
+
+We can use the `push_str` method to append a string:
+
+```
+let mut s = String::from("foo");
+s.push_str("bar");
+```
+
+`push_str` takes a string slice because we don't want to take ownership of the parameter: remember string slices are references technically
+
+The `push` method takes a single character as a parameter and adds it to a `String`:
+
+```
+let mut s = String::from("lo");
+s.push('l');
+```
+
+### Concatenating strings using the + operator
+
+We can do this like so:
+
+```
+let s1 = String::from("Hello, ");
+let s2 = String::from("world!");
+let s3 = s1 + &s2; // note s1 has been moved here and can no longer be used
+```
+
+There's some weird stuff going on in the background like deref coercion of the &s2 into &s2[..] since we can't add two `String`s together but we can add a `&str` to a `String`
+
+For more complicated string concatenation we can use the `format!` macro:
+
+```
+let s1 = String::from("tic");
+let s2 = String::from("tac");
+let s3 = String::from("toe");
+
+let s = format!("{}-{}-{}", s1, s2, s3);
+```
+
+### Indexing into strings
+
+This doesn't work:
+
+```
+let s1 = String::from("hello");
+let h = s1[0];
+```
+
+This has to do with the UTF-8 encoding where some values may take more than one byte and the compiler won't know whether to return the first byte of the value or more bytes
+
+### Slicing strings
+
+Instead of indexing we do this:
+
+```
+let hello = "Здравствуйте";
+
+let s = &hello[0..4];
+```
+
+Here, s will be a &str that contains the first 4 bytes of the string. Earlier, we mentioned that each of these characters was 2 bytes, which means s will be Зд.
+
+If we try to only slice `&hello[0..1]` it will throw an error
+
+### Methods for iterating over strings
+
+we can use the `chars`
+
+```
+for c in "नमस्ते".chars() {
+    println!("{}", c);
+}
+```
+
+The `bytes` method returns each raw byte
+
+## 8.2 Hash Maps
+
+The type HashMap<K, V> stores a mapping of keys of type K to values of type V
+
+### Creating a new hash map
+
+```
+use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Yellow"), 50);
+```
+
+Notice that we have to import the `HashMap` struct first
+
+Hash Maps store their data on the heap, all keys must have the same type and all values must have the same type
+
+Another way to construct a hash map is to use iterators and the `collect` method on a vector of tuples where each tuple consists of a key and a value, i don't feel like writing the explanation for this because apparently it will be talked about in Chapter 13 but here's the code:
+
+```
+use std::collections::HashMap;
+
+let teams = vec![String::from("Blue"), String::from("Yellow")];
+let initial_scores = vec![10, 50];
+
+let mut scores: HashMap<_, _> =
+    teams.into_iter().zip(initial_scores.into_iter()).collect();
+```
+
+The type annotation `HashMap<_, _>` is needed here because it’s possible to collect into many different data structures and Rust doesn’t know which you want unless you specify
+
+### Hash maps and ownership
+
+For types that implement the `Copy` trait, like `i32`, the values are copied into the hash map. For owned values like `String`, the values will be moved and the hash map will be the owner of those values
+
+### Accessing values in a hash map
+
+We can get a value out of the hash map by providing its key to the `get` method
+
+```
+use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Yellow"), 50);
+
+let team_name = String::from("Blue");
+let score = scores.get(&team_name);
+```
+
+`score` will have the value that’s associated with the Blue team, and the result will be `Some(&10)`, the result is wrapped in `Some` because get returns an `Option<&V>`; if there’s no value for that key in the hash map, get will return `None`
+
+We can iterate over each key value pair:
+
+```
+use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Yellow"), 50);
+
+for (key, value) in &scores {
+    println!("{}: {}", key, value);
+}
+```
+
+### Updating a hash map
+
+Hash maps cannot have repeating keys
+
+Overwriting a value:
+
+```
+use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Blue"), 25);
+```
+
+Only inserting if the key has no value:
+
+```
+use std::collections::HashMap;
+
+let mut scores = HashMap::new();
+scores.insert(String::from("Blue"), 10);
+
+scores.entry(String::from("Yellow")).or_insert(50);
+scores.entry(String::from("Blue")).or_insert(50);
+
+println!("{:?}", scores);
+```
+
+Hash maps have a special API for this called `entry` that takes the key you want to check as a parameter. The return value of the `entry` method is an enum called `Entry` that represents a value that might or might not exist
+
+The `or_insert` method on `Entry` is defined to return a mutable reference to the value for the corresponding `Entry` key if that key exists, and if not, inserts the parameter as the new value for this key and returns a mutable reference to the new value
+
+Updating a value based on its old value:
+
+```
+use std::collections::HashMap;
+
+let text = "hello world wonderful world";
+
+let mut map = HashMap::new();
+
+for word in text.split_whitespace() {
+    let count = map.entry(word).or_insert(0);
+    *count += 1;
+}
+
+println!("{:?}", map);
+```
+
+The `or_insert` method returns a mutable reference to the value we insert into the hashmap so we can dereference and change its value
+
+# Chapter 9 - Error Handling
+
+## Unrecoverable errors with panic!
+
+When the `panic!` macro executes, your program will print a failure message, unwind and clean up the stack, and then quit.
+
+```
+fn main() {
+    panic!("crash and burn");
+}
+```
+
+we can set the `RUST_BACKTRACE` to something other than 0 to get the backtrace
+
+## Recoverable errors with Result
+
+```
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
 ```
