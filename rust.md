@@ -83,6 +83,16 @@
 - [Chapter 9 - Error Handling](#chapter-9---error-handling)
   - [Unrecoverable errors with panic!](#unrecoverable-errors-with-panic)
   - [Recoverable errors with Result](#recoverable-errors-with-result)
+    - [Matching on different errors](#matching-on-different-errors)
+    - [Shortcuts for panic on error: unwarap and expect](#shortcuts-for-panic-on-error-unwarap-and-expect)
+    - [Propagating Errors](#propagating-errors)
+    - [Shortcut for propagating errors: ?](#shortcut-for-propagating-errors-)
+    - [The ? operator can only be used in functions that return Result](#the--operator-can-only-be-used-in-functions-that-return-result)
+  - [To panic! or not to panic!](#to-panic-or-not-to-panic)
+    - [Examples, Prototype Code and Tests](#examples-prototype-code-and-tests)
+    - [Cases in which you have more information than the compiler](#cases-in-which-you-have-more-information-than-the-compiler)
+    - [Guidelines for error handling](#guidelines-for-error-handling)
+    - [Creating custom types for validation](#creating-custom-types-for-validation)
 
 # Chapter 1
 
@@ -2193,3 +2203,222 @@ fn main() {
 ```
 
 Note that, like the `Option` enum, the `Result` enum and its variants have been brought into scope by the prelude, so we don’t need to specify `Result::` before the `Ok` and `Err` variants in the match arms.
+
+### Matching on different errors
+
+The previous code will always `panic!` with the same message no matter what the error is, let's say depending on the error we want to panic with a different message:
+
+```
+use std::fs::File;
+use std::io::ErrorKind;
+
+fn main() {
+    let f = File::open("hello.txt");
+
+    let f = match f {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("hello.txt") {
+                Ok(fc) => fc,
+                Err(e) => panic!("Problem creating the file: {:?}", e),
+            },
+            other_error => {
+                panic!("Problem opening the file: {:?}", other_error)
+            }
+        },
+    };
+}
+```
+
+If the error we get from `File::open` is a `NotFound` then we want to try to create a file, and check for errors creating the file
+
+There's a more concise way of writing this code using closures:
+
+```
+use std::fs::File;
+use std::io::ErrorKind;
+
+fn main() {
+    let f = File::open("hello.txt").unwrap_or_else(|error| {
+        if error.kind() == ErrorKind::NotFound {
+            File::create("hello.txt").unwrap_or_else(|error| {
+                panic!("Problem creating the file: {:?}", error);
+            })
+        } else {
+            panic!("Problem opening the file: {:?}", error);
+        }
+    });
+}
+```
+
+After chapter 13 come back here and see if you can understand it better
+
+### Shortcuts for panic on error: unwarap and expect
+
+Using `match` works well but it doesn't always communicate intent well, `Result<T,E>` has helper method defined on it to do various tasks. `unwrap` is one of these methods and it's implemented just like the `match` expression we wrote earlier, if the `Result` is `Ok`, `unwrap` will return the value inside `Ok`, if it's `Err`, `unwrap` will call `panic!` for us:
+
+```
+use std::fs::File;
+
+fn main() {
+    let f = File::open("hello.txt").unwrap();
+}
+```
+
+Another method `expect` which is similar to `unwrap` lets us choose the `panic!` error message:
+
+```
+use std::fs::File;
+
+fn main() {
+    let f = File::open("hello.txt").expect("Failed to open hello.txt");
+}
+```
+
+### Propagating Errors
+
+When writing a function whose implementation calls something that might fail instead of handling the error within the function you can return the error to the calling code so it can decide what to do:
+
+```
+use std::fs::File;
+use std::io;
+use std::io::Read;
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let f = File::open("hello.txt");
+
+    let mut f = match f {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+
+    let mut s = String::new();
+
+    match f.read_to_string(&mut s) {
+        Ok(_) => Ok(s),
+        Err(e) => Err(e),
+    }
+}
+```
+
+Read this code an understand it, that's it. If there's an error in the first match then just return that error from the function
+
+### Shortcut for propagating errors: ?
+
+```
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut f = File::open("hello.txt")?;
+    let mut s = String::new();
+    f.read_to_string(&mut s)?;
+    Ok(s)
+}
+```
+
+The `?` operator will make it so that if the function call returns an error the entire function will return that error, that is all
+
+To make this shorter we could even do this:
+
+```
+use std::fs::File;
+use std::io;
+use std::io::Read;
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut s = String::new();
+
+    File::open("hello.txt")?.read_to_string(&mut s)?;
+
+    Ok(s)
+}
+```
+
+### The ? operator can only be used in functions that return Result
+
+You can't use it in main by default but you can do this thing and change the return type of main:
+
+```
+use std::error::Error;
+use std::fs::File;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let f = File::open("hello.txt")?;
+
+    Ok(())
+}
+```
+
+The `Box<dyn Error>` is a trait object but basically it means any kind of error
+
+## To panic! or not to panic!
+
+Basically the default choice for throwing an error is using `Result<T,E>`
+
+### Examples, Prototype Code and Tests
+
+When you're writing an example having robust error-handling code in the example could make the example less clear.
+
+`unwrap` and `expect` are super handy when prototyping before you're ready to make the program more robust.
+
+If a method call fails in a test, you’d want the whole test to fail, even if that method isn’t the functionality under test. Because `panic!` is how a test is marked as a failure, calling `unwrap` or `expect` is exactly what should happen.
+
+### Cases in which you have more information than the compiler
+
+For example here:
+
+```
+use std::net::IpAddr;
+
+let home: IpAddr = "127.0.0.1".parse().unwrap();
+```
+
+We know that this will never fail but the compiler doesn't, in a case where a user would be inputting a string we would want to do more robust error handling
+
+### Guidelines for error handling
+
+If someone calls your code and passes in values that don’t make sense, the best choice might be to call `panic!` and alert the person using your library to the bug in their code so they can fix it during development. Similarly, `panic!` is often appropriate if you’re calling external code that is out of your control and it returns an invalid state that you have no way of fixing.
+
+However, when failure is expected, it’s more appropriate to return a `Result` than to make a `panic!` call. Examples include a parser being given malformed data or an HTTP request returning a status that indicates you have hit a rate limit. In these cases, returning a `Result` indicates that failure is an expected possibility that the calling code must decide how to handle.
+
+When your code performs operations on values, your code should verify the values are valid first and panic if the values aren’t valid.
+
+Having lots of error checks in all of your functions would be verbose and annoying, you can use Rust’s type system (and thus the type checking the compiler does) to do many of the checks for you.
+
+### Creating custom types for validation
+
+We can replace the following code
+
+```
+let guess: i32 = match guess.trim().parse() {
+    Ok(num) => num,
+    Err(_) => continue,
+};
+
+if guess < 1 || guess > 100 {
+    println!("The secret number will be between 1 and 100.");
+    continue;
+}
+
+match guess.cmp(&secret_number) {
+```
+
+with this:
+
+```
+pub struct Guess {
+    value: i32,
+}
+
+impl Guess {
+    pub fn new(value: i32) -> Guess {
+        if value < 1 || value > 100 {
+            panic!("Guess value must be between 1 and 100, got {}.", value);
+        }
+
+        Guess { value }
+    }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+```
